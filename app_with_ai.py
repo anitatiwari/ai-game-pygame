@@ -1,4 +1,3 @@
-#!/opt/homebrew/bin/python3
 import pygame
 import random
 from ai_bee import AIBee
@@ -35,7 +34,7 @@ bug_img = pygame.transform.scale(bug_img, (bug_size, bug_size))
 
 
 # Define flower
-flower_img = pygame.image.load('flower.png')  # Load flower image
+flower_img = pygame.image.load('flower1.png')  # Load flower image
 flower_size = 30
 flowers = []
 flower_img = pygame.transform.scale(flower_img, (flower_size, flower_size))
