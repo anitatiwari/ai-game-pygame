@@ -18,7 +18,7 @@ GREEN = (0, 100, 0)
 
 # Load images
 bee_img = pygame.image.load('bee.png')
-ai_bee_img = pygame.image.load('ai_bee.png')  
+ai_bee_img = pygame.image.load('ai_bee.png')  # Using the same image for simplicity
 bug_img = pygame.image.load('bug.png')
 flower_img = pygame.image.load('flower.png')
 
@@ -50,29 +50,6 @@ font = pygame.font.Font(None, 36)
 clock = pygame.time.Clock()
 game_over = False
 GRID_SIZE = 5  # Size of the grid cell for pathfinding
-danger_threshold = 100  # Distance at which AI starts fleeing
-
-def distance(x1, y1, x2, y2):
-    """Calculate the Euclidean distance between two points (x1, y1) and (x2, y2)."""
-    return ((x2 - x1)**2 + (y2 - y1)**2)**0.5
-
-
-def compute_utility(action, target):
-    if action == 'move_to_flower':
-        distance_cost = distance(ai_bee_x, ai_bee_y, target[0], target[1])
-        proximity_to_bug = distance(target[0], target[1], bug_x, bug_y)
-        return -distance_cost + max(0, 100 - proximity_to_bug)  # Example utility calculation
-    # Additional utility calculations for other actions
-
-def decide_action():
-    best_action = None
-    max_utility = -float('inf')
-    for flower in flowers:
-        utility = compute_utility('move_to_flower', flower)
-        if utility > max_utility:
-            max_utility = utility
-            best_action = ('move_to_flower', flower)
-    return best_action
 
 # Define helper functions for A* and Dijkstra's Algorithms
 def heuristic(a, b):
@@ -136,65 +113,30 @@ def reconstruct_path(came_from, start, goal):
         current = came_from[current]
     path.reverse()
     return path
-
-def move_away_from_bug():
-    global ai_bee_x, ai_bee_y
-    # Calculate direction vector from bug to AI bee
-    dx, dy = ai_bee_x - bug_x, ai_bee_y - bug_y
-    # Normalize direction
-    distance = max(1, (dx**2 + dy**2)**0.5)
-    dx, dy = dx / distance, dy / distance
-    # Move AI bee away from the bug
-    ai_bee_x += dx * 10
-    ai_bee_y += dy * 10
-    # Keep the AI bee within the screen bounds
-    ai_bee_x = max(0, min(WIDTH - bee_size, ai_bee_x))
-    ai_bee_y = max(0, min(HEIGHT - bee_size, ai_bee_y))
-
-def update_ai_state():
-    global ai_bee_x, ai_bee_y, ai_state, bug_x, bug_y, danger_threshold
-
-    # Check for proximity to the bug
-    if distance(ai_bee_x, ai_bee_y, bug_x, bug_y) < danger_threshold:
-        ai_state = 'fleeing'
-    else:
-        ai_state = 'searching'
-
-    if ai_state == 'fleeing':
-        move_away_from_bug()
-    elif ai_state == 'searching':
-        # Implement logic for searching (moving towards flowers, etc.)
-        pass
-
-
+# Define a variable to store the bug's path
+bug_path = []
 
 # Function to display score
 def show_score(final=False):
     player_message = f"Player Score: {player_score}"
     ai_message = f"AI Score: {ai_score}"
     player_score_text = font.render(player_message, True, WHITE)
-    ai_score_text = font.render(ai_message, True, WHITE)
-    screen.blit(player_score_text, (10 + camera_x, 10))
-    screen.blit(ai_score_text, (10 + camera_x, 40))
+    ai_score_text = font.render(ai_message, True, RED)
+    screen.blit(player_score_text, (10, 10))
+    screen.blit(ai_score_text, (10, 40))
     if final:
         winner = "Player" if player_score > ai_score else "AI"
         winner_message = f"{winner} won!" if player_score != ai_score else "It's a tie!"
         winner_text = font.render(winner_message, True, WHITE)
         screen.blit(winner_text, (WIDTH // 2 - 100, HEIGHT // 2 + 40))
-    
-    # Function to check collision
+
+# Function to check collision
 def check_collision(x1, y1, x2, y2, size):
     return (x1 < x2 + size and x1 + size > x2 and
             y1 < y2 + size and y1 + size > y2)
-
-# Camera offset initialization
-camera_x, camera_y = 0, 0
-
-def adjust_camera():
-    global camera_x, camera_y
-    # Center the camera on the bee, ensuring the camera doesn't move outside the boundaries of the world
-    camera_x = max(0, min(WIDTH - 700, bee_x - 350))
-    camera_y = max(0, min(HEIGHT - 500, bee_y - 250))
+# Define a function to log AI behavior
+def log_ai(message):
+    print("[AI]:", message)
 
 # Main game loop
 def main():
@@ -211,10 +153,6 @@ def main():
 
     while not game_over:
         screen.fill(GREEN)
-        adjust_camera()  # Update the camera position
-        update_ai_state()  # Update AI's behavior based on current state
-
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True  # Quit the entire game
@@ -234,6 +172,9 @@ def main():
         if not path or random.randint(0, 50) == 0:
             came_from = a_star_search((bug_x // GRID_SIZE, bug_y // GRID_SIZE), (bee_x // GRID_SIZE, bee_y // GRID_SIZE))
             path = reconstruct_path(came_from, (bug_x // GRID_SIZE, bug_y // GRID_SIZE), (bee_x // GRID_SIZE, bee_y // GRID_SIZE))
+        log_ai(f"Bug's path: {path}")
+        # Update bug's path
+        bug_path = path[:]
         if path:
             bug_x, bug_y = path.pop(0)
 
@@ -265,18 +206,24 @@ def main():
             flower_y = random.randint(0, HEIGHT - flower_size)
             flowers.append((flower_x, flower_y))
 
+         # Draw bug's path
+        if bug_path:
+            for i in range(len(bug_path) - 1):
+                x1, y1 = bug_path[i]
+                x2, y2 = bug_path[i + 1]
+                pygame.draw.line(screen, RED, (x1, y1), (x2, y2), 2)
+
         # Draw elements
-         # Draw elements adjusted for camera position
-        screen.blit(bee_img, (bee_x - camera_x, bee_y - camera_y))
-        screen.blit(ai_bee_img, (ai_bee_x - camera_x, ai_bee_y - camera_y))
-        screen.blit(bug_img, (bug_x - camera_x, bug_y - camera_y))
+        screen.blit(bee_img, (bee_x, bee_y))
+        screen.blit(ai_bee_img, (ai_bee_x, ai_bee_y))
+        screen.blit(bug_img, (bug_x, bug_y))
         for flower in flowers:
-            screen.blit(flower_img, (flower[0] - camera_x, flower[1] - camera_y))
+            screen.blit(flower_img, (flower[0], flower[1]))
         show_score()
         pygame.display.flip()
         clock.tick(30)
 
-         # Game over screen
+    # Game over screen
     screen.fill(BLACK)
     show_score(final=True)
     pygame.display.flip()
